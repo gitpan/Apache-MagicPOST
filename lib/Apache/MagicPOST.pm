@@ -11,31 +11,26 @@ use AutoLoader qw(AUTOLOAD);
 our @ISA = qw(Exporter);
  
 our @EXPORT = qw();
-our $VERSION = '1.1';
+our $VERSION = '1.2';
  
 use Apache::Constants qw(:common );
 
-sub handler {
-        my $r = shift;
+use Apache::Request;
 
+# ********************************************
+# This module isn't usable, it destroys POST
+# data for subsequent handlers ;-(
+# ********************************************
+sub _handler {
+        my $r = shift;
         return DECLINED unless $r->method() eq 'POST' ;
-	my %params = $r->content;
-	# DEBUG
-	#$r->warn( "------------------------------------------" );
-	#$r->warn( $r->the_request() );
-	#my $href = $r->headers_in();
-	#foreach (keys %$href)
-	#{
-	#	$r->warn( "$_ -> $href->{$_}\n");
-	#}
-	#$r->warn( "------------------------------------------" );
+	return DECLINED unless ($r->header_in('Content-type') eq 'application/x-www-form-urlencoded');
 
 	my $method_param_name = $r->dir_config('MagicPOSTMethodParamName');
-	
 	$method_param_name = 'method' unless ( $method_param_name );
 
-	return DECLINED unless ( exists($params{$method_param_name}));
-
+	my %params = $r->content;
+	return DECLINED unless ( exists ( $params{$method_param_name} ));
 	$r->method( $params{$method_param_name} );
 	delete $params{$method_param_name};
 
@@ -44,15 +39,12 @@ sub handler {
 		$r->header_in( $_ => $params{$_} );
 		delete $params{$_}; 
 	}
-	$r->header_in( 'Content-Length' => undef );
 	$r->header_in( 'Content-length' => undef );
-	$r->header_in( 'Content-Type' => undef );
 	$r->header_in( 'Content-type' => undef );
 
         return OK;
 }
  
-
 1;
 __END__
 # Below is stub documentation for your module. You'd better edit it!
@@ -64,6 +56,15 @@ Apache::MagicPOST - Perl module to emulate arbitray HTTP methods through POST
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
+
+***********************************************************************
+NOTE: This module is not working as I intended since the poking into
+the POST data makes the data unavailable for subsequent modules. To
+make sure that you do not accidentally run into this, the handler method
+has been renamed to _handler(). I'll change this module to work with
+Apache2 (where the intended behavior is possible) in a while.
+***********************************************************************
+
 
 Apache::MagicPOST allows you to send HTTP methods to a server that
 are currently not supported by available browsers. The module,
